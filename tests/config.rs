@@ -11,7 +11,8 @@ fn parse(args: &[&str]) -> Result<Config, String> {
 fn defaults() {
     let c = parse(&[]).unwrap();
     assert_eq!(c.listen, "0.0.0.0:10300");
-    assert_eq!(c.models_dir, PathBuf::from("/models"));
+    assert_eq!(c.asr_file, PathBuf::from("/models/en-ru-uk.tzf"));
+    assert_eq!(c.vad_file, PathBuf::from("/models/silero_vad.onnx"));
     assert_eq!(c.threads, 0);
     assert_eq!(c.turn.beam, 1);
     assert_eq!(c.turn.mode, Mode::Whole);
@@ -34,7 +35,7 @@ fn parses_flags() {
     ])
     .unwrap();
     assert_eq!(c.listen, "127.0.0.1:1");
-    assert_eq!(c.models_dir, PathBuf::from("/m"));
+    assert_eq!(c.asr_file, PathBuf::from("/m/en-ru-uk.tzf"));
     assert_eq!((c.turn.beam, c.threads), (1, 4));
     assert_eq!(c.turn.end_of_speech, EndOfSpeech::HomeAssistant);
     assert_eq!((c.turn.no_speech_seconds, c.turn.max_seconds), (5.0, 20.0));
@@ -71,4 +72,14 @@ fn effective_threads_auto() {
     let auto = parse(&[]).unwrap().effective_threads();
     assert!((1..=8).contains(&auto), "{auto}");
     assert_eq!(parse(&["--threads", "3"]).unwrap().effective_threads(), 3);
+}
+
+#[test]
+fn asr_and_vad_files() {
+    let c = parse(&["--asr", "/data/uz.tzf", "--vad", "/v/silero.onnx"]).unwrap();
+    assert_eq!(c.asr_file, PathBuf::from("/data/uz.tzf"));
+    assert_eq!(c.vad_file, PathBuf::from("/v/silero.onnx"));
+    let c = parse(&["--asr", "/data/uz.tzf", "--models", "/m"]).unwrap();
+    assert_eq!(c.asr_file, PathBuf::from("/data/uz.tzf"));
+    assert_eq!(c.vad_file, PathBuf::from("/m/silero_vad.onnx"));
 }

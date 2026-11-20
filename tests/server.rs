@@ -200,7 +200,7 @@ fn two_requests_at_once() {
 fn load_models_missing_file_names_it() {
     let dir = std::env::temp_dir().join(format!("tinyasr-wyoming-empty-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
-    let e = load_models(&dir, 1).err().unwrap();
+    let e = load_models(&dir.join("en-ru-uk.tzf"), &dir.join("silero_vad.onnx"), 1).err().unwrap();
     assert!(e.contains("en-ru-uk.tzf"), "{e}");
 }
 
@@ -210,7 +210,7 @@ fn load_models_corrupt_file_names_it() {
     std::fs::create_dir_all(&dir).unwrap();
     std::fs::File::create(dir.join("en-ru-uk.tzf")).unwrap().write_all(b"not a model").unwrap();
     std::fs::File::create(dir.join("silero_vad.onnx")).unwrap().write_all(b"not a model").unwrap();
-    let e = load_models(&dir, 1).err().unwrap();
+    let e = load_models(&dir.join("en-ru-uk.tzf"), &dir.join("silero_vad.onnx"), 1).err().unwrap();
     assert!(e.contains("en-ru-uk.tzf") || e.contains("silero_vad.onnx"), "{e}");
 }
 
@@ -232,4 +232,23 @@ fn whole_mode_answers_at_audio_stop() {
     let e = c.next().unwrap();
     assert_eq!(e.kind, "transcript");
     assert!(text(&e).contains("світло"), "{:?}", e.data);
+}
+
+#[test]
+fn info_names_model_after_file() {
+    let cfg = Config::from_args(["--asr", "/data/models/abc/en-es-it-pt.tzf"].map(String::from).into_iter()).unwrap();
+    let e = info_event(&cfg, &["en", "es", "it", "pt"]);
+    let model = &e.data["asr"][0]["models"][0];
+    assert_eq!(model["name"], json!("en-es-it-pt"));
+    assert_eq!(model["languages"], json!(["en", "es", "it", "pt"]));
+}
+
+#[test]
+fn transcript_language_is_the_models_code() {
+    let Some(addr) = whole_server() else { return };
+    let mut c = Client::connect(&addr);
+    c.start("uk-UA");
+    c.chunks(&wav_bytes("uk_command.wav"));
+    c.send("audio-stop", json!({}));
+    assert_eq!(c.next().unwrap().data["language"], json!("uk"));
 }

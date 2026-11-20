@@ -1,10 +1,39 @@
 #!/usr/bin/with-contenv bashio
 # shellcheck shell=bash
-set -e
+set -e -o pipefail
+
+# the recognizer: built in, downloaded once from the commit the image was built with, or the user's own file
+model=$(bashio::config 'model')
+rev=$(cat /models/REV)
+case "$model" in
+  en-ru-uk)
+    asr=/models/en-ru-uk.tzf
+    ;;
+  custom)
+    src=$(bashio::config 'custom_model')
+    [ -f "$src" ] || bashio::exit.nok "custom_model: no file at '${src}' (put it under /share or /media)"
+    case "$src" in
+      *.gz) asr=/data/custom.tzf; gunzip -c "$src" > "$asr.tmp" && mv "$asr.tmp" "$asr" ;;
+      *) asr=$src ;;
+    esac
+    ;;
+  *)
+    mkdir -p "/data/models/$rev"
+    find /data/models -mindepth 1 -maxdepth 1 ! -name "$rev" -exec rm -rf {} +
+    asr=/data/models/$rev/$model.tzf
+    if [ ! -f "$asr" ]; then
+      bashio::log.info "Downloading the ${model} model (once)"
+      curl -fsSL "https://raw.githubusercontent.com/nemethhh/tinyasr/${rev}/models/${model}.tzf.gz" | gunzip > "$asr.tmp" \
+        || bashio::exit.nok "Could not download the ${model} model"
+      mv "$asr.tmp" "$asr"
+    fi
+    ;;
+esac
 
 args=(
   --listen 0.0.0.0:10300
-  --models /models
+  --asr "$asr"
+  --vad /models/silero_vad.onnx
   --mode "$(bashio::config 'mode')"
   --beam "$(bashio::config 'beam')"
   --threads "$(bashio::config 'threads')"

@@ -80,9 +80,17 @@ pub struct Turn<'m> {
     head_done: bool,
 }
 
-/// `"ru-RU"`, `"ru_RU"`, `"RU"` → `"ru"`.
-pub fn normalize_lang(lang: &str) -> String {
-    lang.split(['-', '_']).next().unwrap_or("").trim().to_lowercase()
+/// The model's language for a requested code: the same code (case and `_`/`-` aside), else the first with the same
+/// base (`"ru-RU"` → `"ru"`, `"uz"` → `"uz-Latn"`).
+pub fn pick_lang(requested: &str, langs: &[&str]) -> Option<String> {
+    let norm = |s: &str| s.trim().to_lowercase().replace('_', "-");
+    let base = |s: &str| norm(s).split('-').next().unwrap_or("").to_string();
+    let r = norm(requested);
+    if r.is_empty() {
+        return None;
+    }
+    let pick = langs.iter().find(|l| norm(l) == r).or_else(|| langs.iter().find(|l| base(l) == base(&r)));
+    pick.map(|l| l.to_string())
 }
 
 pub fn join_words(words: &[Word]) -> String {

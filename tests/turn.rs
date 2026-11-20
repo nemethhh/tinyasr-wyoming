@@ -2,7 +2,7 @@ mod common;
 
 use common::{models, run, seconds, wav_bytes};
 use tinyasr::Word;
-use tinyasr_wyoming::turn::{EndOfSpeech, EndReason, Mode, Turn, TurnConfig, join_words, normalize_lang};
+use tinyasr_wyoming::turn::{EndOfSpeech, EndReason, Mode, Turn, TurnConfig, join_words, pick_lang};
 
 fn live() -> TurnConfig {
     TurnConfig { mode: Mode::Live, ..TurnConfig::default() }
@@ -127,11 +127,18 @@ fn odd_byte_chunks_give_same_text() {
 }
 
 #[test]
-fn normalize_lang_cases() {
-    assert_eq!(normalize_lang("ru-RU"), "ru");
-    assert_eq!(normalize_lang("ru_RU"), "ru");
-    assert_eq!(normalize_lang("RU"), "ru");
-    assert_eq!(normalize_lang("en"), "en");
+fn pick_lang_cases() {
+    let eru = ["en", "ru", "uk"];
+    assert_eq!(pick_lang("ru-RU", &eru).as_deref(), Some("ru"));
+    assert_eq!(pick_lang("ru_RU", &eru).as_deref(), Some("ru"));
+    assert_eq!(pick_lang("RU", &eru).as_deref(), Some("ru"));
+    assert_eq!(pick_lang("de", &eru), None);
+    assert_eq!(pick_lang("", &eru), None);
+    let uz = ["en", "uz-Latn", "uz-Latin-Russian", "uz-Cyrl"];
+    assert_eq!(pick_lang("uz", &uz).as_deref(), Some("uz-Latn"));
+    assert_eq!(pick_lang("uz-Cyrl", &uz).as_deref(), Some("uz-Cyrl"));
+    assert_eq!(pick_lang("uz_cyrl", &uz).as_deref(), Some("uz-Cyrl"));
+    assert_eq!(pick_lang("en-US", &uz).as_deref(), Some("en"));
 }
 
 #[test]

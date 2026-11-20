@@ -1,7 +1,7 @@
 name: tinyasr
-version: 0.2.0
+version: 0.3.0
 slug: tinyasr
-description: Light, fast speech to text for Assist (English, Russian, Ukrainian) with tinyasr
+description: Light speech to text for Assist with tinyasr (en, ru, uk, es, it, pt, fa, km, uz)
 url: https://github.com/nemethhh/tinyasr-wyoming
 arch:
   - amd64
@@ -12,8 +12,14 @@ startup: services
 discovery:
   - wyoming
 hassio_api: true
+map:
+  - type: share
+    read_only: true
+  - type: media
+    read_only: true
 watchdog: tcp://[HOST]:10300
 options:
+  model: en-ru-uk
   mode: whole
   beam: 1
   threads: 0
@@ -34,6 +40,8 @@ options:
     - ziggy
   debug_logging: false
 schema:
+  model: list(en-ru-uk|en-es-it-pt|en-fa|en-km|uz|custom)
+  custom_model: str?
   mode: list(whole|live)
   beam: int(1,8)
   threads: int(0,8)

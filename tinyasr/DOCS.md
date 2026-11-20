@@ -1,7 +1,21 @@
 # tinyasr
 
 Speech to text for Home Assistant's Assist with [tinyasr](https://github.com/dkaraush/tinyasr): a small,
-dependency-free recognizer (about 65 MB of RAM in use) for **English, Russian and Ukrainian**.
+dependency-free recognizer (about 65 MB of RAM in use) with small multilingual models.
+
+## Models
+
+| `model` | languages |
+|---|---|
+| `en-ru-uk` (default, built in) | English, Russian, Ukrainian |
+| `en-es-it-pt` | English, Spanish, Italian, Portuguese |
+| `en-fa` | English, Persian |
+| `en-km` | English, Khmer |
+| `uz` | Uzbek (Latin, Cyrillic, mixed), English |
+| `custom` | a tinyasr model file of your own: set `custom_model` to its path under `/share` or `/media` (`.tzf` or `.tzf.gz`) |
+
+Models other than `en-ru-uk` are downloaded once (about 30 MB) when the add-on starts with them, and kept. Home
+Assistant is offered the languages of the model in use; after changing `model`, reload the integration (see below).
 
 ## Setup
 
@@ -37,7 +51,7 @@ Home Assistant's own "finished speaking" detection is not used for assistants wi
 With `end_of_speech: home_assistant`, Home Assistant ends requests as with any other speech to text, and the add-on
 only transcribes.
 
-**After changing `mode` or `end_of_speech`, reload the integration**: Settings → Devices & services → Wyoming Protocol →
+**After changing `model`, `mode` or `end_of_speech`, reload the integration**: Settings → Devices & services → Wyoming Protocol →
 tinyasr → ⋮ → Reload (or restart Home Assistant). Home Assistant reads this setting only when it sets up the
 service; until the reload it keeps the old one, and with `home_assistant` nobody would end requests early.
 
@@ -45,6 +59,8 @@ service; until the reload it keeps the old one, and with `home_assistant` nobody
 
 | option | default | |
 |---|---|---|
+| `model` | `en-ru-uk` | See Models. |
+| `custom_model` | | Path of your own model file with `model: custom`. |
 | `mode` | `whole` | `whole` or `live` (see above). |
 | `beam` | 1 | Beam width of the full pass: 1 is fastest, 4 most accurate. |
 | `threads` | 0 | CPU threads; 0: all cores (at most 8). |

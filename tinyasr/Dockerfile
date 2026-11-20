@@ -12,7 +12,8 @@ RUN rev=$(sed -n 's|.*nemethhh/tinyasr?branch=wyoming-pause-end#\([0-9a-f]*\)".*
     && test -n "$rev" && mkdir -p /out/models \
     && for f in en-ru-uk.tzf silero_vad.onnx; do \
          curl -fsSL "https://raw.githubusercontent.com/nemethhh/tinyasr/$rev/models/$f.gz" | gunzip > "/out/models/$f"; \
-       done
+       done \
+    && echo "$rev" > /out/models/REV
 
 FROM $BUILD_FROM
 COPY --from=build /src/target/release/tinyasr-wyoming /usr/bin/tinyasr-wyoming

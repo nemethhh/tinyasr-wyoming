@@ -8,7 +8,8 @@ use crate::turn::{EndOfSpeech, Mode, TurnConfig};
 #[derive(Clone, Debug)]
 pub struct Config {
     pub listen: String,
-    pub models_dir: PathBuf,
+    pub asr_file: PathBuf,
+    pub vad_file: PathBuf,
     pub threads: usize,
     pub turn: TurnConfig,
 }
@@ -22,18 +23,20 @@ impl Config {
     pub fn from_args(args: impl Iterator<Item = String>) -> Result<Config, String> {
         let mut c = Config {
             listen: "0.0.0.0:10300".into(),
-            models_dir: PathBuf::from("/models"),
+            asr_file: PathBuf::new(),
+            vad_file: PathBuf::new(),
             threads: 0,
             turn: TurnConfig::default(),
         };
         let mut args = args;
+        let (mut models_dir, mut asr, mut vad) = (PathBuf::from("/models"), None, None);
         while let Some(flag) = args.next() {
             if flag == "--debug" {
                 c.turn.debug = true;
                 continue;
             }
             let known = [
-                "--listen", "--mode", "--models", "--beam", "--threads", "--end-of-speech", "--no-speech-seconds", "--max-seconds",
+                "--listen", "--mode", "--models", "--asr", "--vad", "--beam", "--threads", "--end-of-speech", "--no-speech-seconds", "--max-seconds",
                 "--min-pause-seconds", "--max-pause-seconds", "--wake-words",
             ];
             if !known.contains(&flag.as_str()) {
@@ -43,7 +46,9 @@ impl Config {
             let f = flag.as_str();
             match f {
                 "--listen" => c.listen = v,
-                "--models" => c.models_dir = PathBuf::from(v),
+                "--models" => models_dir = PathBuf::from(v),
+                "--asr" => asr = Some(PathBuf::from(v)),
+                "--vad" => vad = Some(PathBuf::from(v)),
                 "--mode" => {
                     c.turn.mode = match v.as_str() {
                         "whole" => Mode::Whole,
@@ -70,6 +75,8 @@ impl Config {
                 _ => unreachable!(),
             }
         }
+        c.asr_file = asr.unwrap_or_else(|| models_dir.join("en-ru-uk.tzf"));
+        c.vad_file = vad.unwrap_or_else(|| models_dir.join("silero_vad.onnx"));
         if c.turn.beam == 0 {
             return Err("--beam: must be at least 1".into());
         }

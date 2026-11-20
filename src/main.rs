@@ -14,7 +14,7 @@ fn main() {
         }
     };
     let t0 = Instant::now();
-    let models = match load_models(&cfg.models_dir, cfg.effective_threads()) {
+    let models = match load_models(&cfg.asr_file, &cfg.vad_file, cfg.effective_threads()) {
         Ok(m) => m,
         Err(e) => {
             eprintln!("tinyasr-wyoming: cannot load the models: {e}");
@@ -31,9 +31,10 @@ fn main() {
         }
     };
     eprintln!(
-        "tinyasr-wyoming {} listening on {}: languages {}, models loaded in {} ms, mode {:?}, {} threads, beam {}, end of speech {:?}",
+        "tinyasr-wyoming {} listening on {}: model {}, languages {}, models loaded in {} ms, mode {:?}, {} threads, beam {}, end of speech {:?}",
         env!("CARGO_PKG_VERSION"),
         cfg.listen,
+        cfg.asr_file.display(),
         models.langs().join(", "),
         t0.elapsed().as_millis(),
         cfg.turn.mode,

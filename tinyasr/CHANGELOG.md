@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0
+
+- Any tinyasr model: new `model` option (`en-ru-uk` built in; `en-es-it-pt`, `en-fa`, `en-km`, `uz` downloaded once
+  on first start; `custom` with `custom_model`, a `.tzf` or `.tzf.gz` under `/share` or `/media`). Home Assistant is
+  offered the model's own languages.
+
 ## 0.2.0
 
 - New `mode` option, `whole` by default: Home Assistant ends the request, then tinyasr transcribes it in one pass.

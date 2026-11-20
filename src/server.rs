@@ -9,24 +9,21 @@ use serde_json::json;
 use tinyasr::Models;
 
 use crate::config::Config;
-use crate::turn::{EndOfSpeech, Mode, Outcome, Turn, normalize_lang};
+use crate::turn::{EndOfSpeech, Mode, Outcome, Turn, pick_lang};
 use crate::wyoming::{Event, read_event, write_event};
 
-const ASR_FILE: &str = "en-ru-uk.tzf";
-const VAD_FILE: &str = "silero_vad.onnx";
-const MODEL_NAME: &str = "en-ru-uk";
-
-pub fn load_models(dir: &Path, threads: usize) -> Result<Models, String> {
-    let read = |f: &str| std::fs::read(dir.join(f)).map_err(|e| format!("{}: {e}", dir.join(f).display()));
-    let (asr, vad) = (read(ASR_FILE)?, read(VAD_FILE)?);
+pub fn load_models(asr_file: &Path, vad_file: &Path, threads: usize) -> Result<Models, String> {
+    let read = |f: &Path| std::fs::read(f).map_err(|e| format!("{}: {e}", f.display()));
+    let (asr, vad) = (read(asr_file)?, read(vad_file)?);
     let mut m = Models::load(tinyasr::Files { asr: &asr, vad: &vad })
-        .map_err(|e| format!("{ASR_FILE} / {VAD_FILE} in {}: {e}", dir.display()))?;
+        .map_err(|e| format!("{} / {}: {e}", asr_file.display(), vad_file.display()))?;
     m.set_threads(threads);
     Ok(m)
 }
 
 pub fn info_event(cfg: &Config, langs: &[&str]) -> Event {
     let attribution = json!({"name": "tinyasr", "url": "https://github.com/dkaraush/tinyasr"});
+    let model = cfg.asr_file.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
     Event::new(
         "info",
         json!({"asr": [{
@@ -36,8 +33,8 @@ pub fn info_event(cfg: &Config, langs: &[&str]) -> Event {
             "installed": true,
             "version": env!("CARGO_PKG_VERSION"),
             "models": [{
-                "name": MODEL_NAME,
-                "description": "tinyasr en-ru-uk",
+                "name": model,
+                "description": format!("tinyasr {model}"),
                 "attribution": attribution,
                 "installed": true,
                 "version": tinyasr::version().to_string(),
@@ -98,11 +95,12 @@ fn handle(stream: TcpStream, models: &'static Models, cfg: &'static Config) -> i
         match e.kind.as_str() {
             "describe" => write_event(&mut w, &info_event(cfg, &langs))?,
             "transcribe" => {
-                let l = normalize_lang(e.data.get("language").and_then(|v| v.as_str()).unwrap_or(""));
-                if !langs.contains(&l.as_str()) {
-                    write_event(&mut w, &error_event("unsupported-language", format!("language {l:?} not in {langs:?}")))?;
+                let requested = e.data.get("language").and_then(|v| v.as_str()).unwrap_or("");
+                let Some(l) = pick_lang(requested, &langs) else {
+                    let text = format!("language {requested:?} not in {langs:?}");
+                    write_event(&mut w, &error_event("unsupported-language", text))?;
                     return Ok(());
-                }
+                };
                 lang = Some(l);
             }
             "audio-start" => {

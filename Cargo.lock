@@ -92,7 +92,7 @@ source = "git+https://github.com/nemethhh/tinyasr?branch=wyoming-pause-end#8ff90
 
 [[package]]
 name = "tinyasr-wyoming"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "serde_json",
  "tinyasr",
