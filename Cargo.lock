@@ -88,7 +88,7 @@ dependencies = [
 [[package]]
 name = "tinyasr"
 version = "0.1.0"
-source = "git+https://github.com/nemethhh/tinyasr?branch=wyoming-pause-end#58079749c5b6b7a42b5fba3a7d14f9e65af2baa1"
+source = "git+https://github.com/nemethhh/tinyasr?branch=wyoming-pause-end#8ff9079a61a128523575824e5f3d4edd1d62463e"
 
 [[package]]
 name = "tinyasr-wyoming"
