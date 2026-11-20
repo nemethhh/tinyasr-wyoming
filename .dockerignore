@@ -1,0 +1,8 @@
+target/
+models/
+.cache/
+.cargo/
+tools/
+.superpowers/
+.git/
+tests/

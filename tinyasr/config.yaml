@@ -1,0 +1,44 @@
+name: tinyasr
+version: 0.1.0
+slug: tinyasr
+description: Light, fast speech to text for Assist (English, Russian, Ukrainian) with tinyasr
+url: https://github.com/nemethhh/tinyasr-wyoming
+arch:
+  - amd64
+  - aarch64
+image: ghcr.io/nemethhh/{arch}-addon-tinyasr
+init: false
+startup: services
+discovery:
+  - wyoming
+hassio_api: true
+options:
+  beam: 4
+  threads: 2
+  end_of_speech: tinyasr
+  min_pause_seconds: 0.7
+  max_pause_seconds: 1.25
+  no_speech_seconds: 8
+  max_seconds: 30
+  wake_words:
+    - alexa
+    - алекса
+    - echo
+    - эхо
+    - computer
+    - компьютер
+    - amazon
+    - амазон
+    - ziggy
+  debug_logging: false
+schema:
+  beam: int(1,8)
+  threads: int(1,8)
+  end_of_speech: list(tinyasr|home_assistant)
+  min_pause_seconds: float(0.3,3)
+  max_pause_seconds: float(0.5,5)
+  no_speech_seconds: int(2,30)
+  max_seconds: int(5,120)
+  wake_words:
+    - str
+  debug_logging: bool

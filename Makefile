@@ -19,3 +19,14 @@ test: models
 
 release:
 	$(CARGO) build --release
+
+image:
+	docker build -f tinyasr/Dockerfile --build-arg BUILD_FROM=ghcr.io/home-assistant/amd64-base:3.21 -t tinyasr-addon .
+
+smoke:
+	docker rm -f tinyasr-smoke >/dev/null 2>&1 || true
+	docker run -d --name tinyasr-smoke -p 127.0.0.1:10399:10300 --entrypoint /usr/bin/tinyasr-wyoming tinyasr-addon --models /models
+	sleep 2
+	uv run -q --no-project --with wyoming python tools/wyoming_client.py 127.0.0.1 10399 tests/fixtures/ru_command.wav ru
+	docker logs tinyasr-smoke
+	docker rm -f tinyasr-smoke >/dev/null
