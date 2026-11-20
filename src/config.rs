@@ -1,0 +1,71 @@
+//! Command-line settings (the add-on's run.sh maps its options to these flags).
+
+use std::path::PathBuf;
+use std::str::FromStr;
+
+use crate::turn::{EndOfSpeech, TurnConfig};
+
+#[derive(Clone, Debug)]
+pub struct Config {
+    pub listen: String,
+    pub models_dir: PathBuf,
+    pub threads: usize,
+    pub turn: TurnConfig,
+}
+
+fn num<T: FromStr>(flag: &str, v: &str) -> Result<T, String> {
+    v.parse().map_err(|_| format!("{flag}: bad value {v:?}"))
+}
+
+impl Config {
+    /// Arguments without the program name.
+    pub fn from_args(args: impl Iterator<Item = String>) -> Result<Config, String> {
+        let mut c = Config {
+            listen: "0.0.0.0:10300".into(),
+            models_dir: PathBuf::from("/models"),
+            threads: 2,
+            turn: TurnConfig::default(),
+        };
+        let mut args = args;
+        while let Some(flag) = args.next() {
+            if flag == "--debug" {
+                c.turn.debug = true;
+                continue;
+            }
+            let known = [
+                "--listen", "--models", "--beam", "--threads", "--end-of-speech", "--no-speech-seconds", "--max-seconds",
+                "--min-pause-seconds", "--max-pause-seconds", "--wake-words",
+            ];
+            if !known.contains(&flag.as_str()) {
+                return Err(format!("unknown flag {flag}"));
+            }
+            let v = args.next().ok_or_else(|| format!("{flag}: missing value"))?;
+            let f = flag.as_str();
+            match f {
+                "--listen" => c.listen = v,
+                "--models" => c.models_dir = PathBuf::from(v),
+                "--beam" => c.turn.beam = num(f, &v)?,
+                "--threads" => c.threads = num(f, &v)?,
+                "--end-of-speech" => {
+                    c.turn.end_of_speech = match v.as_str() {
+                        "tinyasr" => EndOfSpeech::Tinyasr,
+                        "home_assistant" => EndOfSpeech::HomeAssistant,
+                        _ => return Err(format!("{f}: bad value {v:?} (tinyasr or home_assistant)")),
+                    }
+                }
+                "--no-speech-seconds" => c.turn.no_speech_seconds = num(f, &v)?,
+                "--max-seconds" => c.turn.max_seconds = num(f, &v)?,
+                "--min-pause-seconds" => c.turn.min_pause_seconds = num(f, &v)?,
+                "--max-pause-seconds" => c.turn.max_pause_seconds = num(f, &v)?,
+                "--wake-words" => {
+                    c.turn.wake_words = v.split(',').map(|w| w.trim().to_string()).filter(|w| !w.is_empty()).collect()
+                }
+                _ => unreachable!(),
+            }
+        }
+        if c.turn.beam == 0 {
+            return Err("--beam: must be at least 1".into());
+        }
+        Ok(c)
+    }
+}
