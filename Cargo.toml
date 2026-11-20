@@ -1,0 +1,25 @@
+[package]
+name = "tinyasr-wyoming"
+version = "0.1.0"
+edition = "2024"
+license = "GPL-3.0-or-later"
+description = "Wyoming speech-to-text server for Home Assistant, running tinyasr"
+repository = "https://github.com/nemethhh/tinyasr-wyoming"
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "tinyasr-wyoming"
+path = "src/main.rs"
+
+[dependencies]
+tinyasr = { git = "https://github.com/nemethhh/tinyasr", branch = "wyoming-pause-end" }
+serde_json = "1"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+panic = "abort"
