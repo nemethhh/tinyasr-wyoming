@@ -1,0 +1,49 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  version:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tag matches the add-on version
+        run: |
+          version=$(sed -n 's/^version: *//p' tinyasr/config.yaml)
+          test "v$version" = "$GITHUB_REF_NAME" || { echo "tag $GITHUB_REF_NAME, config.yaml $version"; exit 1; }
+
+  image:
+    needs: version
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: tinyasr/Dockerfile
+          build-args: BUILD_FROM=ghcr.io/home-assistant/${{ matrix.arch }}-base:3.21
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/${{ matrix.arch }}-addon-tinyasr:${{ steps.v.outputs.version }}
+            ghcr.io/${{ github.repository_owner }}/${{ matrix.arch }}-addon-tinyasr:latest
