@@ -12,6 +12,7 @@ startup: services
 discovery:
   - wyoming
 hassio_api: true
+watchdog: tcp://[HOST]:10300
 options:
   beam: 4
   threads: 2

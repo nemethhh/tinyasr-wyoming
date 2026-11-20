@@ -60,3 +60,19 @@ fn non_ascii_text_is_written_raw() {
     assert!(s.contains("Включи свет."), "{s}");
     assert!(!s.contains("\\u"), "{s}");
 }
+
+#[test]
+fn oversized_lengths_are_rejected() {
+    for field in ["payload_length", "data_length"] {
+        let input = format!("{{\"type\":\"audio-chunk\",\"{field}\":1000000000000000}}\n").into_bytes();
+        let err = read_event(&mut BufReader::new(Cursor::new(input))).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::InvalidData, "{field}");
+    }
+}
+
+#[test]
+fn overlong_header_is_rejected() {
+    let input = vec![b'{'; 2 << 20];
+    let err = read_event(&mut BufReader::new(Cursor::new(input))).unwrap_err();
+    assert_eq!(err.kind(), ErrorKind::InvalidData);
+}

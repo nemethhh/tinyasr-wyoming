@@ -26,6 +26,10 @@ Home Assistant's own "finished speaking" detection is not used for assistants wi
 With `end_of_speech: home_assistant`, Home Assistant ends requests as with any other speech to text, and the add-on
 only transcribes.
 
+**After changing `end_of_speech`, reload the integration**: Settings → Devices & services → Wyoming Protocol →
+tinyasr → ⋮ → Reload (or restart Home Assistant). Home Assistant reads this setting only when it sets up the
+service; until the reload it keeps the old one, and with `home_assistant` nobody would end requests early.
+
 ## Options
 
 | option | default | |

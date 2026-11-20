@@ -1,10 +1,12 @@
 //! Wyoming events: a JSON header line, then optional data JSON (`data_length`) and binary payload (`payload_length`).
 
-use std::io::{self, BufRead, Write};
+use std::io::{self, BufRead, Read, Write};
 
 use serde_json::{Map, Value};
 
 const VERSION: &str = "1.7.2";
+/// Largest header line, data block or payload accepted (HA sends a few KB).
+const MAX_LEN: usize = 1 << 20;
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Event {
@@ -30,15 +32,21 @@ fn bad(msg: impl Into<String>) -> io::Error {
 fn length(header: &Map<String, Value>, key: &str) -> io::Result<usize> {
     match header.get(key) {
         None | Some(Value::Null) => Ok(0),
-        Some(v) => v.as_u64().map(|n| n as usize).ok_or_else(|| bad(format!("bad {key}"))),
+        Some(v) => match v.as_u64() {
+            Some(n) if n as usize <= MAX_LEN => Ok(n as usize),
+            _ => Err(bad(format!("bad {key}: {v}"))),
+        },
     }
 }
 
 /// `Ok(None)` on a clean end of stream before a header.
 pub fn read_event(r: &mut impl BufRead) -> io::Result<Option<Event>> {
     let mut line = Vec::new();
-    if r.read_until(b'\n', &mut line)? == 0 {
+    if r.by_ref().take(MAX_LEN as u64 + 1).read_until(b'\n', &mut line)? == 0 {
         return Ok(None);
+    }
+    if line.len() > MAX_LEN {
+        return Err(bad("header too long"));
     }
     let header: Map<String, Value> = serde_json::from_slice(&line).map_err(|e| bad(format!("header: {e}")))?;
     let kind = header.get("type").and_then(Value::as_str).ok_or_else(|| bad("header without type"))?.to_string();
