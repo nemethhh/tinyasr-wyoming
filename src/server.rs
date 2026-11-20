@@ -9,7 +9,7 @@ use serde_json::json;
 use tinyasr::Models;
 
 use crate::config::Config;
-use crate::turn::{EndOfSpeech, Outcome, Turn, normalize_lang};
+use crate::turn::{EndOfSpeech, Mode, Outcome, Turn, normalize_lang};
 use crate::wyoming::{Event, read_event, write_event};
 
 const ASR_FILE: &str = "en-ru-uk.tzf";
@@ -44,7 +44,7 @@ pub fn info_event(cfg: &Config, langs: &[&str]) -> Event {
                 "languages": langs,
             }],
             "supports_transcript_streaming": false,
-            "requires_external_vad": cfg.turn.end_of_speech == EndOfSpeech::HomeAssistant,
+            "requires_external_vad": cfg.turn.mode == Mode::Whole || cfg.turn.end_of_speech == EndOfSpeech::HomeAssistant,
             "prefers_auto_gain_enabled": true,
             "prefers_noise_reduction_enabled": true,
         }]}),

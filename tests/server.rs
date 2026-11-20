@@ -12,18 +12,25 @@ use tinyasr_wyoming::server::{info_event, load_models, serve};
 use tinyasr_wyoming::turn::EndOfSpeech;
 use tinyasr_wyoming::wyoming::{Event, read_event, write_event};
 
-/// One server for all tests (default config), or None without models.
+fn start(args: &[&str]) -> Option<String> {
+    let m = models()?;
+    let cfg: &'static Config = Box::leak(Box::new(Config::from_args(args.iter().map(|s| s.to_string())).unwrap()));
+    let l = TcpListener::bind("127.0.0.1:0").unwrap();
+    let addr = l.local_addr().unwrap().to_string();
+    std::thread::spawn(move || serve(l, m, cfg));
+    Some(addr)
+}
+
+/// A live-mode server shared by the tests, or None without models.
 fn server() -> Option<String> {
     static ADDR: OnceLock<Option<String>> = OnceLock::new();
-    ADDR.get_or_init(|| {
-        let m = models()?;
-        let cfg: &'static Config = Box::leak(Box::new(Config::from_args(std::iter::empty()).unwrap()));
-        let l = TcpListener::bind("127.0.0.1:0").unwrap();
-        let addr = l.local_addr().unwrap().to_string();
-        std::thread::spawn(move || serve(l, m, cfg));
-        Some(addr)
-    })
-    .clone()
+    ADDR.get_or_init(|| start(&["--mode", "live"])).clone()
+}
+
+/// A whole-mode (default) server.
+fn whole_server() -> Option<String> {
+    static ADDR: OnceLock<Option<String>> = OnceLock::new();
+    ADDR.get_or_init(|| start(&[])).clone()
 }
 
 struct Client {
@@ -205,4 +212,24 @@ fn load_models_corrupt_file_names_it() {
     std::fs::File::create(dir.join("silero_vad.onnx")).unwrap().write_all(b"not a model").unwrap();
     let e = load_models(&dir, 1).err().unwrap();
     assert!(e.contains("en-ru-uk.tzf") || e.contains("silero_vad.onnx"), "{e}");
+}
+
+#[test]
+fn whole_mode_server_requires_external_vad() {
+    let Some(addr) = whole_server() else { return };
+    let mut c = Client::connect(&addr);
+    c.send("describe", json!({}));
+    assert_eq!(c.next().unwrap().data["asr"][0]["requires_external_vad"], json!(true));
+}
+
+#[test]
+fn whole_mode_answers_at_audio_stop() {
+    let Some(addr) = whole_server() else { return };
+    let mut c = Client::connect(&addr);
+    c.start("uk-UA");
+    c.chunks(&wav_bytes("uk_command.wav"));
+    c.send("audio-stop", json!({}));
+    let e = c.next().unwrap();
+    assert_eq!(e.kind, "transcript");
+    assert!(text(&e).contains("світло"), "{:?}", e.data);
 }

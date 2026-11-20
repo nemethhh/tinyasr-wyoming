@@ -5,6 +5,7 @@ set -e
 args=(
   --listen 0.0.0.0:10300
   --models /models
+  --mode "$(bashio::config 'mode')"
   --beam "$(bashio::config 'beam')"
   --threads "$(bashio::config 'threads')"
   --end-of-speech "$(bashio::config 'end_of_speech')"

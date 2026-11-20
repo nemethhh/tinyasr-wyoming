@@ -1,5 +1,5 @@
 name: tinyasr
-version: 0.1.0
+version: 0.2.0
 slug: tinyasr
 description: Light, fast speech to text for Assist (English, Russian, Ukrainian) with tinyasr
 url: https://github.com/nemethhh/tinyasr-wyoming
@@ -14,8 +14,9 @@ discovery:
 hassio_api: true
 watchdog: tcp://[HOST]:10300
 options:
-  beam: 4
-  threads: 2
+  mode: whole
+  beam: 1
+  threads: 0
   end_of_speech: tinyasr
   min_pause_seconds: 0.7
   max_pause_seconds: 1.25
@@ -33,8 +34,9 @@ options:
     - ziggy
   debug_logging: false
 schema:
+  mode: list(whole|live)
   beam: int(1,8)
-  threads: int(1,8)
+  threads: int(0,8)
   end_of_speech: list(tinyasr|home_assistant)
   min_pause_seconds: float(0.3,3)
   max_pause_seconds: float(0.5,5)

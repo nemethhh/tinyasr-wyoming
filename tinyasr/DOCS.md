@@ -11,7 +11,18 @@ dependency-free recognizer (about 65 MB of RAM in use) for **English, Russian an
 
 Each assistant recognizes in its own language (no language detection).
 
-## When a request ends
+## Modes
+
+- **`whole`** (default): Home Assistant decides when you have finished speaking (its "Finished speaking detection"),
+  then tinyasr transcribes the whole request in one pass. Works on low-power CPUs: on an Intel Celeron N4100 a
+  request takes about as long to transcribe as it took to say.
+- **`live`**: tinyasr listens while you speak and decides itself when you have finished (below). Needs a CPU that
+  keeps up with the audio (a recent desktop or laptop CPU does easily; a Celeron/Atom-class CPU does not: requests
+  then take many seconds). Raise `beam` to 4 there for the best accuracy.
+
+After changing `mode`, reload the integration (see below).
+
+## When a request ends (live mode)
 
 By default (`end_of_speech: tinyasr`) the add-on, not Home Assistant, decides when you have finished speaking, and
 Home Assistant's own "finished speaking" detection is not used for assistants with tinyasr:
@@ -26,7 +37,7 @@ Home Assistant's own "finished speaking" detection is not used for assistants wi
 With `end_of_speech: home_assistant`, Home Assistant ends requests as with any other speech to text, and the add-on
 only transcribes.
 
-**After changing `end_of_speech`, reload the integration**: Settings → Devices & services → Wyoming Protocol →
+**After changing `mode` or `end_of_speech`, reload the integration**: Settings → Devices & services → Wyoming Protocol →
 tinyasr → ⋮ → Reload (or restart Home Assistant). Home Assistant reads this setting only when it sets up the
 service; until the reload it keeps the old one, and with `home_assistant` nobody would end requests early.
 
@@ -34,9 +45,10 @@ service; until the reload it keeps the old one, and with `home_assistant` nobody
 
 | option | default | |
 |---|---|---|
-| `beam` | 4 | Beam width of the final pass: 1 is fastest, 4 most accurate. |
-| `threads` | 2 | CPU threads per request. |
-| `end_of_speech` | `tinyasr` | `tinyasr` or `home_assistant` (see above). |
+| `mode` | `whole` | `whole` or `live` (see above). |
+| `beam` | 1 | Beam width of the full pass: 1 is fastest, 4 most accurate. |
+| `threads` | 0 | CPU threads; 0: all cores (at most 8). |
+| `end_of_speech` | `tinyasr` | Live mode: `tinyasr` or `home_assistant` (see above). |
 | `min_pause_seconds` | 0.7 | Shortest pause that can end a request. |
 | `max_pause_seconds` | 1.25 | A pause this long always ends it. |
 | `no_speech_seconds` | 8 | Give up when nothing is said. |

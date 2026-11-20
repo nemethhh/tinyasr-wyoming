@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 use std::str::FromStr;
 
-use crate::turn::{EndOfSpeech, TurnConfig};
+use crate::turn::{EndOfSpeech, Mode, TurnConfig};
 
 #[derive(Clone, Debug)]
 pub struct Config {
@@ -23,7 +23,7 @@ impl Config {
         let mut c = Config {
             listen: "0.0.0.0:10300".into(),
             models_dir: PathBuf::from("/models"),
-            threads: 2,
+            threads: 0,
             turn: TurnConfig::default(),
         };
         let mut args = args;
@@ -33,7 +33,7 @@ impl Config {
                 continue;
             }
             let known = [
-                "--listen", "--models", "--beam", "--threads", "--end-of-speech", "--no-speech-seconds", "--max-seconds",
+                "--listen", "--mode", "--models", "--beam", "--threads", "--end-of-speech", "--no-speech-seconds", "--max-seconds",
                 "--min-pause-seconds", "--max-pause-seconds", "--wake-words",
             ];
             if !known.contains(&flag.as_str()) {
@@ -44,6 +44,13 @@ impl Config {
             match f {
                 "--listen" => c.listen = v,
                 "--models" => c.models_dir = PathBuf::from(v),
+                "--mode" => {
+                    c.turn.mode = match v.as_str() {
+                        "whole" => Mode::Whole,
+                        "live" => Mode::Live,
+                        _ => return Err(format!("{f}: bad value {v:?} (whole or live)")),
+                    }
+                }
                 "--beam" => c.turn.beam = num(f, &v)?,
                 "--threads" => c.threads = num(f, &v)?,
                 "--end-of-speech" => {
@@ -67,5 +74,13 @@ impl Config {
             return Err("--beam: must be at least 1".into());
         }
         Ok(c)
+    }
+
+    /// `threads`, or with 0 the machine's cores (at most 8).
+    pub fn effective_threads(&self) -> usize {
+        match self.threads {
+            0 => std::thread::available_parallelism().map_or(1, |n| n.get()).min(8),
+            n => n,
+        }
     }
 }

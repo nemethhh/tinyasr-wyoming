@@ -11,7 +11,8 @@ Then install **tinyasr**; see its [documentation](tinyasr/DOCS.md).
 
 - amd64 and aarch64 (prebuilt images).
 - About 65 MB of RAM in use.
-- Decides itself when you have finished speaking (tinyasr's end-of-turn model), or leaves that to Home Assistant.
+- Runs on low-power CPUs (`whole` mode, the default); on fast CPUs `live` mode streams and decides itself when
+  you have finished speaking.
 
 ## Development
 

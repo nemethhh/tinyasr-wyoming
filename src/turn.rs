@@ -1,4 +1,4 @@
-//! One request: a tinyasr session plus the rules that end it.
+//! One request: a live tinyasr session plus the rules that end it, or audio buffered for one pass at the end.
 
 use tinyasr::{Event, Models, Session, Word};
 
@@ -8,8 +8,16 @@ pub enum EndOfSpeech {
     HomeAssistant,
 }
 
+/// `Whole`: buffer, one pass at the end (HA ends the request; slow CPUs). `Live`: stream, tinyasr may end it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Mode {
+    Whole,
+    Live,
+}
+
 #[derive(Clone, Debug)]
 pub struct TurnConfig {
+    pub mode: Mode,
     pub end_of_speech: EndOfSpeech,
     pub beam: usize,
     pub no_speech_seconds: f32,
@@ -25,8 +33,9 @@ pub struct TurnConfig {
 impl Default for TurnConfig {
     fn default() -> TurnConfig {
         TurnConfig {
+            mode: Mode::Whole,
             end_of_speech: EndOfSpeech::Tinyasr,
-            beam: 4,
+            beam: 1,
             no_speech_seconds: 8.0,
             max_seconds: 30.0,
             min_pause_seconds: 0.7,
@@ -54,8 +63,13 @@ pub struct Outcome {
     pub audio_seconds: f32,
 }
 
+enum Engine<'m> {
+    Live(Session<'m>),
+    Whole { models: &'m Models, lang: String, audio: Vec<f32> },
+}
+
 pub struct Turn<'m> {
-    session: Session<'m>,
+    engine: Engine<'m>,
     cfg: TurnConfig,
     wake: Vec<String>,
     carry: Option<u8>,
@@ -90,9 +104,14 @@ fn normalize_text(s: &str) -> String {
 
 impl<'m> Turn<'m> {
     pub fn new(models: &'m Models, lang: &str, cfg: &TurnConfig) -> Turn<'m> {
-        let opt = tinyasr::Options { beam: cfg.beam, ..Default::default() };
+        let engine = match cfg.mode {
+            Mode::Live => {
+                Engine::Live(Session::new(models, &[lang], tinyasr::Options { beam: cfg.beam, ..Default::default() }))
+            }
+            Mode::Whole => Engine::Whole { models, lang: lang.to_string(), audio: Vec::new() },
+        };
         Turn {
-            session: Session::new(models, &[lang], opt),
+            engine,
             cfg: cfg.clone(),
             wake: cfg.wake_words.iter().map(|w| normalize_text(w)).collect(),
             carry: None,
@@ -132,9 +151,15 @@ impl<'m> Turn<'m> {
     }
 
     fn conclude(&mut self, reason: EndReason) -> Outcome {
-        let events = self.session.finish();
-        self.take(events);
-        Outcome { text: join_words(&self.committed), reason, audio_seconds: self.audio_seconds() }
+        let text = match &mut self.engine {
+            Engine::Live(session) => {
+                let events = session.finish();
+                self.take(events);
+                join_words(&self.committed)
+            }
+            Engine::Whole { models, lang, audio } => whole_pass(models, audio, lang, self.cfg.beam),
+        };
+        Outcome { text, reason, audio_seconds: self.audio_seconds() }
     }
 
     /// 16-bit little-endian PCM, any length (an odd last byte waits for the next call).
@@ -148,15 +173,22 @@ impl<'m> Turn<'m> {
         let x: Vec<f32> =
             bytes.chunks_exact(2).map(|b| i16::from_le_bytes([b[0], b[1]]) as f32 / 32768.0).collect();
         self.samples += x.len() as u64;
-        let events = self.session.push(&x);
+        let session = match &mut self.engine {
+            Engine::Live(session) => session,
+            Engine::Whole { audio, .. } => {
+                audio.extend_from_slice(&x);
+                return (self.audio_seconds() >= self.cfg.max_seconds).then(|| self.conclude(EndReason::MaxLength));
+            }
+        };
+        let events = session.push(&x);
+        let (pause_ends, quiet) = (session.pause_ends(), session.quiet_seconds());
         self.take(events);
 
         if self.cfg.end_of_speech == EndOfSpeech::Tinyasr {
-            if self.session.pause_ends() > self.pause_ends {
-                self.pause_ends = self.session.pause_ends();
+            if pause_ends > self.pause_ends {
+                self.pause_ends = pause_ends;
                 self.head_done |= self.is_speech(&self.committed);
             }
-            let quiet = self.session.quiet_seconds();
             if quiet == 0.0 {
                 self.head_done = false;
             }
@@ -176,4 +208,11 @@ impl<'m> Turn<'m> {
     pub fn finish(mut self) -> Outcome {
         self.conclude(EndReason::AudioStop)
     }
+}
+
+/// One full-context pass; a beam search that finds no words is retried greedy (it can miss a clear sentence).
+fn whole_pass(models: &Models, audio: &[f32], lang: &str, beam: usize) -> String {
+    let run = |beam| join_words(&tinyasr::Transcription::new(models, audio, &[lang], beam).flatten().collect::<Vec<_>>());
+    let text = run(beam);
+    if text.is_empty() && beam > 1 { run(1) } else { text }
 }
